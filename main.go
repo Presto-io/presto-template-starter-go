@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	_ "embed"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -30,7 +31,18 @@ type Frontmatter struct {
 func main() {
 	showManifest := flag.Bool("manifest", false, "output embedded manifest.json")
 	showExample := flag.Bool("example", false, "output embedded example.md")
+	showVersion := flag.Bool("version", false, "output version from manifest")
 	flag.Parse()
+
+	if *showVersion {
+		var m map[string]interface{}
+		if err := json.Unmarshal(manifestData, &m); err == nil {
+			if v, ok := m["version"]; ok {
+				fmt.Println(v)
+			}
+		}
+		return
+	}
 
 	if *showManifest {
 		os.Stdout.Write(manifestData)

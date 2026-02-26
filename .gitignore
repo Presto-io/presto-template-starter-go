@@ -1,2 +1,5 @@
 presto-template-*
 !presto-template-*.go
+
+# Claude Code
+.claude/

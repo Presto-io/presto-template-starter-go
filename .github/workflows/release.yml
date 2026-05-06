@@ -22,6 +22,12 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Sync manifest version from release tag
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          python3 scripts/sync-manifest-version.py "${VERSION}" manifest.json
+
       - name: Read template name from manifest
         id: meta
         run: echo "name=$(jq -r .name manifest.json)" >> "$GITHUB_OUTPUT"
@@ -36,6 +42,14 @@ jobs:
           OUTNAME="presto-template-${{ steps.meta.outputs.name }}-${{ matrix.goos }}-${{ matrix.goarch }}${EXT}"
           go build -trimpath -ldflags="-s -w" -o "${OUTNAME}" .
           echo "OUTNAME=${OUTNAME}" >> "$GITHUB_ENV"
+
+      - name: Verify embedded manifest version
+        if: matrix.goos == 'linux' && matrix.goarch == 'amd64'
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ACTUAL="$("./${OUTNAME}" --version)"
+          test "${ACTUAL}" = "${VERSION}"
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

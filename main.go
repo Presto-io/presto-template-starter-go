@@ -112,9 +112,9 @@ func writePageSetup(w *bufio.Writer, meta *Frontmatter) {
 	fmt.Fprintln(w)
 
 	if meta.Title != "" {
-		fmt.Fprintf(w, "#let title = %q\n", meta.Title)
+		fmt.Fprintf(w, "#let title = \"%s\"\n", escapeTypstString(meta.Title))
 		fmt.Fprintln(w)
-		fmt.Fprintf(w, "#align(center, text(size: 22pt, weight: \"bold\")[%s])\n", meta.Title)
+		fmt.Fprintf(w, "#align(center, text(size: 22pt, weight: \"bold\")[%s])\n", escapeTypstContent(meta.Title))
 		fmt.Fprintln(w, `#v(1em)`)
 		fmt.Fprintln(w)
 	}
@@ -144,7 +144,7 @@ func renderBody(w *bufio.Writer, source []byte) {
 
 		case *ast.Text:
 			if entering {
-				w.Write(node.Segment.Value(source))
+				fmt.Fprint(w, escapeTypstContent(string(node.Segment.Value(source))))
 				if node.SoftLineBreak() {
 					fmt.Fprintln(w)
 				}
@@ -185,7 +185,7 @@ func renderBody(w *bufio.Writer, source []byte) {
 
 		case *ast.CodeSpan:
 			if entering {
-				fmt.Fprintf(w, "#raw(\"%s\")", string(node.Text(source)))
+				fmt.Fprintf(w, "#raw(\"%s\")", escapeTypstString(string(node.Text(source))))
 			}
 
 		case *ast.FencedCodeBlock:
@@ -197,10 +197,41 @@ func renderBody(w *bufio.Writer, source []byte) {
 					buf.Write(line.Value(source))
 				}
 				content := strings.TrimRight(buf.String(), "\n")
-				fmt.Fprintf(w, "```\n%s\n```\n\n", content)
+				fmt.Fprint(w, typstRawBlock(content))
 			}
 		}
 
 		return ast.WalkContinue, nil
 	})
+}
+
+func escapeTypstString(s string) string {
+	replacer := strings.NewReplacer(`\`, `\\`, `"`, `\"`, `#`, `\#`)
+	return replacer.Replace(s)
+}
+
+func escapeTypstContent(s string) string {
+	replacer := strings.NewReplacer(`\`, `\\`, `]`, `\]`, `#`, `\#`)
+	return replacer.Replace(s)
+}
+
+func typstRawBlock(content string) string {
+	fence := strings.Repeat("`", max(3, maxBacktickRun(content)+1))
+	return fmt.Sprintf("%s\n%s\n%s\n\n", fence, content, fence)
+}
+
+func maxBacktickRun(s string) int {
+	maxRun := 0
+	current := 0
+	for _, r := range s {
+		if r == '`' {
+			current++
+			if current > maxRun {
+				maxRun = current
+			}
+			continue
+		}
+		current = 0
+	}
+	return maxRun
 }

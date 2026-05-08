@@ -17,6 +17,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const maxInputBytes = 10 * 1024 * 1024
+
 //go:embed manifest.json
 var manifestData []byte
 
@@ -53,7 +55,7 @@ func main() {
 		return
 	}
 
-	input, err := io.ReadAll(os.Stdin)
+	input, err := readStdinLimited()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error reading stdin: %v\n", err)
 		os.Exit(1)
@@ -74,6 +76,17 @@ func main() {
 
 	writePageSetup(w, &meta)
 	renderBody(w, body)
+}
+
+func readStdinLimited() ([]byte, error) {
+	input, err := io.ReadAll(io.LimitReader(os.Stdin, maxInputBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if len(input) > maxInputBytes {
+		return nil, fmt.Errorf("input exceeds %d bytes", maxInputBytes)
+	}
+	return input, nil
 }
 
 // splitFrontmatter separates YAML frontmatter (between --- delimiters) from the body.

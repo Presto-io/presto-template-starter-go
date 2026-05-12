@@ -30,10 +30,26 @@ type Frontmatter struct {
 	Title string `yaml:"title"`
 }
 
+type OutputInfo struct {
+	SchemaVersion  int          `json:"schemaVersion"`
+	OutputBaseName string       `json:"outputBaseName"`
+	PreviewTitle   string       `json:"previewTitle,omitempty"`
+	Document       DocumentInfo `json:"document,omitempty"`
+}
+
+type DocumentInfo struct {
+	Title    string   `json:"title,omitempty"`
+	Authors  []string `json:"authors,omitempty"`
+	Date     string   `json:"date,omitempty"`
+	Keywords []string `json:"keywords,omitempty"`
+	Language string   `json:"language,omitempty"`
+}
+
 func main() {
 	showManifest := flag.Bool("manifest", false, "output embedded manifest.json")
 	showExample := flag.Bool("example", false, "output embedded example.md")
 	showVersion := flag.Bool("version", false, "output version from manifest")
+	showInfo := flag.Bool("info", false, "output document info JSON")
 	flag.Parse()
 
 	if *showVersion {
@@ -71,11 +87,47 @@ func main() {
 		}
 	}
 
+	if *showInfo {
+		data, err := json.Marshal(outputInfo(&meta))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error encoding info: %v\n", err)
+			os.Exit(1)
+		}
+		os.Stdout.Write(data)
+		return
+	}
+
 	w := bufio.NewWriter(os.Stdout)
 	defer w.Flush()
 
 	writePageSetup(w, &meta)
 	renderBody(w, body)
+}
+
+func outputInfo(meta *Frontmatter) OutputInfo {
+	title := strings.TrimSpace(meta.Title)
+	if title == "" {
+		title = "output"
+	}
+	return OutputInfo{
+		SchemaVersion:  1,
+		OutputBaseName: cleanFilenameBase(title),
+		PreviewTitle:   title,
+		Document: DocumentInfo{
+			Title:    title,
+			Keywords: []string{"模板"},
+			Language: "zh-CN",
+		},
+	}
+}
+
+func cleanFilenameBase(value string) string {
+	replacer := strings.NewReplacer("/", "_", "\\", "_", ":", "_", "*", "_", "?", "_", `"`, "_", "<", "_", ">", "_", "|", "_")
+	value = strings.TrimSpace(replacer.Replace(value))
+	if value == "" {
+		return "output"
+	}
+	return value
 }
 
 func readStdinLimited() ([]byte, error) {

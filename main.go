@@ -97,11 +97,27 @@ func main() {
 		return
 	}
 
-	w := bufio.NewWriter(os.Stdout)
-	defer w.Flush()
+	var output bytes.Buffer
+	w := bufio.NewWriter(&output)
 
 	writePageSetup(w, &meta)
 	renderBody(w, body)
+	if err := w.Flush(); err != nil {
+		fmt.Fprintf(os.Stderr, "error flushing output: %v\n", err)
+		os.Exit(1)
+	}
+	if err := ensureNonBlankTypst(output.String()); err != nil {
+		fmt.Fprintf(os.Stderr, "error converting template: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Print(output.String())
+}
+
+func ensureNonBlankTypst(output string) error {
+	if strings.TrimSpace(output) == "" {
+		return fmt.Errorf("converter produced empty Typst output")
+	}
+	return nil
 }
 
 func outputInfo(meta *Frontmatter) OutputInfo {
